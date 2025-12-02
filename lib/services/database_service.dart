@@ -53,9 +53,24 @@ class DatabaseService {
   }
 
   /// Inserta un nuevo comprobante en la base de datos.
+  /// Retorna el ID del comprobante insertado, o -1 si ya existe (duplicado).
   Future<int> insertReceipt(ReceiptData receipt) async {
     final Database db = await database;
 
+    // Validar duplicados por número de operación
+    if (receipt.operationNumber != null &&
+        receipt.operationNumber!.isNotEmpty) {
+      final existing = await _getReceiptByOperationNumber(
+        receipt.operationNumber!,
+      );
+
+      if (existing != null) {
+        // Ya existe - retornar -1 para indicar duplicado
+        return -1;
+      }
+    }
+
+    // No es duplicado - insertar normalmente
     return await db.insert('receipts', {
       'merchant': receipt.merchant,
       'amount': receipt.amount,
@@ -67,6 +82,22 @@ class DatabaseService {
       'created_at': DateTime.now().toIso8601String(),
       'updated_at': DateTime.now().toIso8601String(),
     }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  /// Busca un comprobante por número de operación.
+  Future<Map<String, dynamic>?> _getReceiptByOperationNumber(
+    String operationNumber,
+  ) async {
+    final Database db = await database;
+
+    final List<Map<String, dynamic>> results = await db.query(
+      'receipts',
+      where: 'operation_number = ?',
+      whereArgs: [operationNumber],
+      limit: 1,
+    );
+
+    return results.isNotEmpty ? results.first : null;
   }
 
   /// Obtiene todos los comprobantes ordenados por fecha descendente.
@@ -85,7 +116,7 @@ class DatabaseService {
         date: maps[i]['date'] as String,
         time: maps[i]['time'] as String?,
         operationNumber: maps[i]['operation_number'] as String?,
-        description: maps[i]['description'] as String,
+        description: maps[i]['description'] as String?,
       );
     });
   }
@@ -113,7 +144,7 @@ class DatabaseService {
         date: maps[i]['date'] as String,
         time: maps[i]['time'] as String?,
         operationNumber: maps[i]['operation_number'] as String?,
-        description: maps[i]['description'] as String,
+        description: maps[i]['description'] as String?,
       );
     });
   }
@@ -139,7 +170,7 @@ class DatabaseService {
         date: maps[i]['date'] as String,
         time: maps[i]['time'] as String?,
         operationNumber: maps[i]['operation_number'] as String?,
-        description: maps[i]['description'] as String,
+        description: maps[i]['description'] as String?,
       );
     });
   }

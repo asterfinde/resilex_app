@@ -85,7 +85,22 @@ class _HomeScreenState extends State<HomeScreen> {
         }
 
         if (date != null) {
-          final monthKey = DateFormat('MMMM yyyy', 'es_PE').format(date);
+          // Formato simple sin localización: "Noviembre 2025"
+          final months = [
+            'Enero',
+            'Febrero',
+            'Marzo',
+            'Abril',
+            'Mayo',
+            'Junio',
+            'Julio',
+            'Agosto',
+            'Septiembre',
+            'Octubre',
+            'Noviembre',
+            'Diciembre',
+          ];
+          final monthKey = '${months[date.month - 1]} ${date.year}';
           grouped.putIfAbsent(monthKey, () => []);
           grouped[monthKey]!.add(ticket);
         }

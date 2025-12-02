@@ -69,15 +69,21 @@ class _ImagePickerScreenState extends State<ImagePickerScreen> {
     final List<ReceiptData> results = [];
     final List<String> errors = [];
     int savedCount = 0;
+    int duplicateCount = 0;
 
     for (int i = 0; i < _selectedImages.length; i++) {
       try {
         final result = await _parser.parseFromImage(_selectedImages[i].path);
         results.add(result);
 
-        // Guardar en SQLite
-        await _db.insertReceipt(result);
-        savedCount++;
+        // Guardar en SQLite (retorna -1 si es duplicado)
+        final id = await _db.insertReceipt(result);
+
+        if (id == -1) {
+          duplicateCount++;
+        } else {
+          savedCount++;
+        }
 
         setState(() {
           _processedCount = i + 1;
@@ -96,14 +102,32 @@ class _ImagePickerScreenState extends State<ImagePickerScreen> {
       return;
     }
 
-    // Mostrar mensaje de éxito
+    // Mostrar mensaje de éxito con info de duplicados
     if (mounted) {
+      String message;
+      Color? backgroundColor;
+
+      if (duplicateCount > 0 && savedCount > 0) {
+        // Algunos nuevos, algunos duplicados
+        message =
+            '$savedCount nuevo${savedCount != 1 ? 's' : ''} • '
+            '$duplicateCount duplicado${duplicateCount != 1 ? 's' : ''} omitido${duplicateCount != 1 ? 's' : ''}';
+        backgroundColor = Colors.orange[600];
+      } else if (duplicateCount > 0 && savedCount == 0) {
+        // Todos duplicados
+        message = 'Todos los comprobantes ya estaban registrados';
+        backgroundColor = Colors.orange[700];
+      } else {
+        // Todos nuevos
+        message =
+            '$savedCount comprobante${savedCount != 1 ? 's' : ''} guardado${savedCount != 1 ? 's' : ''}';
+        backgroundColor = Colors.green[600];
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            '$savedCount comprobante${savedCount != 1 ? 's' : ''} guardado${savedCount != 1 ? 's' : ''}',
-          ),
-          backgroundColor: Colors.green[600],
+          content: Text(message),
+          backgroundColor: backgroundColor,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
