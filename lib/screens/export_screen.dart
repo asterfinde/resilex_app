@@ -1,8 +1,12 @@
-// lib/screens/export_screen.dart
+﻿// lib/screens/export_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:receipt_parser/receipt_parser.dart';
+import 'package:intl/intl.dart';
 import '../services/csv_exporter_service.dart';
+import '../services/database_service.dart';
+
+enum ExportFilter { all, month, dateRange }
 
 /// Pantalla para exportar y compartir el archivo CSV generado
 class ExportScreen extends StatefulWidget {
@@ -16,63 +20,107 @@ class ExportScreen extends StatefulWidget {
 
 class _ExportScreenState extends State<ExportScreen> {
   final CsvExporterService _csvService = CsvExporterService();
+  final DatabaseService _db = DatabaseService();
 
+  ExportFilter _selectedFilter = ExportFilter.all;
+  String? _selectedMonth;
+  List<String> _availableMonths = [];
   bool _isExporting = false;
-  bool _exportCompleted = false;
-  String? _filePath;
-  String? _fileName;
-  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    // Auto-generar CSV al entrar a la pantalla
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _generateCsv();
+    _loadAvailableMonths();
+  }
+
+  void _loadAvailableMonths() {
+    final Set<String> months = {};
+
+    for (var receipt in widget.receipts) {
+      if (receipt.date == null || receipt.date!.isEmpty) continue;
+
+      try {
+        final parts = receipt.date!.split('/');
+        if (parts.length == 3) {
+          final month = '${parts[1]}/${parts[2]}'; // "MM/YYYY"
+          months.add(month);
+        }
+      } catch (e) {
+        continue;
+      }
+    }
+
+    setState(() {
+      _availableMonths = months.toList()..sort((a, b) => b.compareTo(a));
+      if (_availableMonths.isNotEmpty) {
+        _selectedMonth = _availableMonths.first;
+      }
     });
   }
 
-  Future<void> _generateCsv() async {
+  Future<void> _exportCsv() async {
     setState(() {
       _isExporting = true;
-      _errorMessage = null;
     });
 
     try {
-      final result = await _csvService.exportAndShare(widget.receipts);
+      List<ReceiptData> receiptsToExport;
 
-      if (result['success'] == true) {
-        setState(() {
-          _exportCompleted = true;
-          _filePath = result['filePath'];
-          _fileName = result['fileName'];
-          _isExporting = false;
-        });
-      } else {
-        setState(() {
-          _errorMessage = result['error'] ?? 'Error desconocido';
-          _isExporting = false;
-        });
+      switch (_selectedFilter) {
+        case ExportFilter.all:
+          receiptsToExport = widget.receipts;
+          break;
+
+        case ExportFilter.month:
+          if (_selectedMonth == null) {
+            throw Exception('Selecciona un mes');
+          }
+          receiptsToExport = await _db.getReceiptsByMonth(_selectedMonth!);
+          break;
+
+        case ExportFilter.dateRange:
+          // TODO: Implementar selector de rango de fechas
+          receiptsToExport = widget.receipts;
+          break;
+      }
+
+      if (receiptsToExport.isEmpty) {
+        throw Exception('No hay comprobantes para exportar con este filtro');
+      }
+
+      final result = await _csvService.exportAndShare(receiptsToExport);
+
+      setState(() {
+        _isExporting = false;
+      });
+
+      if (result['success'] == true && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'CSV exportado: ${receiptsToExport.length} comprobantes',
+            ),
+            backgroundColor: Colors.green[600],
+            action: SnackBarAction(
+              label: 'Compartir',
+              textColor: Colors.white,
+              onPressed: () async {
+                await _csvService.shareCsvFile(result['filePath']);
+              },
+            ),
+          ),
+        );
       }
     } catch (e) {
       setState(() {
-        _errorMessage = e.toString();
         _isExporting = false;
       });
-    }
-  }
 
-  Future<void> _shareFile() async {
-    if (_filePath == null) return;
-
-    try {
-      await _csvService.shareCsvFile(_filePath!);
-    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al compartir: $e'),
-            backgroundColor: Colors.red,
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red[400],
           ),
         );
       }
@@ -81,107 +129,145 @@ class _ExportScreenState extends State<ExportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final cyan = Theme.of(context).colorScheme.primary;
-
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: const Color(0xFF0A0A0A),
       appBar: AppBar(
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_outlined, color: cyan),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Exportar CSV',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-            letterSpacing: -0.5,
-          ),
-        ),
+        title: const Text('Exportar CSV'),
+        backgroundColor: const Color(0xFF0A0A0A),
       ),
-      body: _isExporting
-          ? _buildLoadingView()
-          : _errorMessage != null
-          ? _buildErrorView()
-          : _buildSuccessView(),
-    );
-  }
-
-  Widget _buildLoadingView() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircularProgressIndicator(
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            'Generando archivo CSV...',
-            style: TextStyle(fontSize: 16, color: Colors.white70),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildErrorView() {
-    final cyan = Theme.of(context).colorScheme.primary;
-
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
+      body: Padding(
+        padding: const EdgeInsets.all(24.0),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: Colors.red.withOpacity(0.3),
-                  width: 2,
-                ),
-              ),
-              child: Icon(
-                Icons.error_outline,
-                size: 64,
-                color: Colors.red[400],
-              ),
-            ),
-            const SizedBox(height: 24),
             const Text(
-              'Error al generar CSV',
+              'Selecciona qué exportar',
               style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
                 color: Colors.white,
               ),
             ),
-            const SizedBox(height: 16),
-            Text(
-              _errorMessage ?? 'Error desconocido',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white54),
+            const SizedBox(height: 24),
+
+            // Opción: Exportar todo
+            _buildFilterOption(
+              ExportFilter.all,
+              'Todo',
+              'Exportar todos los comprobantes (${widget.receipts.length})',
+              Icons.select_all,
             ),
-            const SizedBox(height: 32),
-            FilledButton.icon(
-              onPressed: _generateCsv,
-              icon: const Icon(Icons.refresh, color: Colors.black),
-              label: const Text(
-                'Reintentar',
-                style: TextStyle(
-                  color: Colors.black,
-                  fontWeight: FontWeight.w600,
+
+            const SizedBox(height: 16),
+
+            // Opción: Exportar por mes
+            _buildFilterOption(
+              ExportFilter.month,
+              'Por mes',
+              'Exportar comprobantes de un mes específico',
+              Icons.calendar_month,
+            ),
+
+            if (_selectedFilter == ExportFilter.month && _availableMonths.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(left: 56, top: 12),
+                child: DropdownButtonFormField<String>(
+                  value: _selectedMonth,
+                  dropdownColor: const Color(0xFF1A1A1A),
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF22d3ee)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: const Color(0xFF22d3ee).withOpacity(0.3),
+                      ),
+                    ),
+                  ),
+                  items: _availableMonths.map((month) {
+                    final parts = month.split('/');
+                    final monthName = DateFormat('MMMM yyyy', 'es_PE').format(
+                      DateTime(int.parse(parts[1]), int.parse(parts[0])),
+                    );
+                    return DropdownMenuItem(
+                      value: month,
+                      child: Text(monthName),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedMonth = value;
+                    });
+                  },
                 ),
               ),
-              style: FilledButton.styleFrom(
-                backgroundColor: cyan,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 18,
+
+            const Spacer(),
+
+            // Información del total
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1A1A),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFF22d3ee).withOpacity(0.2),
                 ),
               ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Total a exportar:',
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                  Text(
+                    '${widget.receipts.length} comprobantes',
+                    style: const TextStyle(
+                      color: Color(0xFF22d3ee),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // Botón exportar
+            ElevatedButton(
+              onPressed: _isExporting ? null : _exportCsv,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF22d3ee),
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: _isExporting
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.black,
+                      ),
+                    )
+                  : const Text(
+                      'Exportar CSV',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
             ),
           ],
         ),
@@ -189,262 +275,82 @@ class _ExportScreenState extends State<ExportScreen> {
     );
   }
 
-  Widget _buildSuccessView() {
-    final cyan = Theme.of(context).colorScheme.primary;
-    final cardBg = Theme.of(context).cardColor;
-    final stats = _csvService.getStatistics(widget.receipts);
-    final csvContent = _csvService.generateCsvContent(widget.receipts);
-    final previewLines = csvContent.split('\n').take(5).toList();
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Success card
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: cyan.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: cyan.withOpacity(0.3), width: 1.5),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: cyan,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.check_rounded,
-                    size: 32,
-                    color: Colors.black,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '¡CSV Generado!',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'Archivo guardado exitosamente',
-                        style: TextStyle(color: Colors.white70),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // File info
-          _buildInfoCard(
-            cardBg: cardBg,
-            title: 'Información del Archivo',
-            children: [
-              _buildInfoRow(
-                Icons.insert_drive_file_outlined,
-                'Nombre',
-                _fileName ?? 'N/A',
-              ),
-              const SizedBox(height: 4),
-              _buildInfoRow(
-                Icons.receipt_outlined,
-                'Registros',
-                '${stats['total']} tickets',
-              ),
-              const SizedBox(height: 4),
-              _buildInfoRow(
-                Icons.attach_money,
-                'Total',
-                'S/ ${stats['totalAmount'].toStringAsFixed(2)}',
-                isCyan: true,
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Preview
-          _buildInfoCard(
-            cardBg: cardBg,
-            title: 'Vista Previa',
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.black,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white.withOpacity(0.05)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Primeras líneas del CSV:',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white70,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    ...previewLines.map((line) {
-                      final shortLine = line.length > 60
-                          ? '${line.substring(0, 60)}...'
-                          : line;
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2),
-                        child: Text(
-                          shortLine,
-                          style: const TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 11,
-                            color: Colors.white54,
-                          ),
-                        ),
-                      );
-                    }),
-                    if (csvContent.split('\n').length > 5)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text(
-                          '... y ${csvContent.split('\n').length - 5} líneas más',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Colors.white38,
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-
-          // Action buttons
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: _shareFile,
-              icon: const Icon(Icons.share_outlined, color: Colors.black),
-              label: const Text(
-                'Compartir CSV',
-                style: TextStyle(
-                  color: Colors.black,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                ),
-              ),
-              style: FilledButton.styleFrom(
-                backgroundColor: cyan,
-                padding: const EdgeInsets.symmetric(vertical: 20),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () {
-                Navigator.popUntil(context, (route) => route.isFirst);
-              },
-              icon: Icon(Icons.home_outlined, color: cyan),
-              label: Text(
-                'Volver al Inicio',
-                style: TextStyle(
-                  color: cyan,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                ),
-              ),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 20),
-                side: BorderSide(color: cyan, width: 1.5),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoCard({
-    required Color cardBg,
-    required String title,
-    required List<Widget> children,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 16),
-          ...children,
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(
+  Widget _buildFilterOption(
+    ExportFilter filter,
+    String title,
+    String subtitle,
     IconData icon,
-    String label,
-    String value, {
-    bool isCyan = false,
-  }) {
-    final cyan = Theme.of(context).colorScheme.primary;
+  ) {
+    final isSelected = _selectedFilter == filter;
 
-    return Row(
-      children: [
-        Icon(icon, size: 20, color: Colors.white38),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            label,
-            style: const TextStyle(color: Colors.white54, fontSize: 14),
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _selectedFilter = filter;
+        });
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFF22d3ee).withOpacity(0.1)
+              : const Color(0xFF1A1A1A),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFF22d3ee)
+                : const Color(0xFF1A1A1A),
+            width: 2,
           ),
         ),
-        Text(
-          value,
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 14,
-            color: isCyan ? cyan : Colors.white,
-          ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? const Color(0xFF22d3ee).withOpacity(0.2)
+                    : Colors.grey.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                icon,
+                color: isSelected ? const Color(0xFF22d3ee) : Colors.grey,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: isSelected ? const Color(0xFF22d3ee) : Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: Colors.white60,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isSelected)
+              const Icon(
+                Icons.check_circle,
+                color: Color(0xFF22d3ee),
+              ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

@@ -23,6 +23,10 @@ dependencies:
   # Para generar CSV
   csv: ^6.0.0
 
+  # SQLite para storage local
+  sqflite: ^2.3.0
+  path: ^1.8.3
+
   flutter:
     sdk: flutter
 

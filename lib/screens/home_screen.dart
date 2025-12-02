@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:receipt_parser/receipt_parser.dart';
 import 'package:intl/intl.dart';
 import '../widgets/ticket_list_item.dart';
+import '../services/database_service.dart';
 import 'image_picker_screen.dart';
 import 'export_screen.dart';
 
@@ -17,11 +18,46 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   List<ReceiptData> _tickets = [];
   final ScrollController _scrollController = ScrollController();
+  final DatabaseService _db = DatabaseService();
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTicketsFromDB();
+  }
 
   @override
   void dispose() {
     _scrollController.dispose();
     super.dispose();
+  }
+
+  /// Carga todos los comprobantes desde SQLite
+  Future<void> _loadTicketsFromDB() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final tickets = await _db.getAllReceipts();
+      setState(() {
+        _tickets = tickets;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al cargar comprobantes: $e'),
+            backgroundColor: Colors.red[400],
+          ),
+        );
+      }
+    }
   }
 
   Map<String, List<ReceiptData>> _groupTicketsByMonth(
@@ -130,15 +166,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _navigateToImagePicker() async {
-    final result = await Navigator.push<List<ReceiptData>>(
+    final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(builder: (context) => const ImagePickerScreen()),
     );
 
-    if (result != null && result.isNotEmpty) {
-      setState(() {
-        _tickets.addAll(result);
-      });
+    // Si se guardaron comprobantes, recargar desde DB
+    if (result == true) {
+      await _loadTicketsFromDB();
     }
   }
 
@@ -180,13 +215,12 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
         ],
       ),
-      body: _tickets.isEmpty
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _tickets.isEmpty
           ? _buildEmptyState()
           : RefreshIndicator(
-              onRefresh: () async {
-                // Por ahora solo refrescar la UI
-                setState(() {});
-              },
+              onRefresh: _loadTicketsFromDB,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: CustomScrollView(

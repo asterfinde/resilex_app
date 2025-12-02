@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:receipt_parser/receipt_parser.dart';
+import '../services/database_service.dart';
 import 'dart:io';
 
 /// Pantalla para seleccionar y procesar imágenes de tickets
@@ -16,6 +17,7 @@ class ImagePickerScreen extends StatefulWidget {
 class _ImagePickerScreenState extends State<ImagePickerScreen> {
   final ImagePicker _picker = ImagePicker();
   final ReceiptParser _parser = ReceiptParser();
+  final DatabaseService _db = DatabaseService();
 
   List<XFile> _selectedImages = [];
   bool _isProcessing = false;
@@ -66,11 +68,17 @@ class _ImagePickerScreenState extends State<ImagePickerScreen> {
 
     final List<ReceiptData> results = [];
     final List<String> errors = [];
+    int savedCount = 0;
 
     for (int i = 0; i < _selectedImages.length; i++) {
       try {
         final result = await _parser.parseFromImage(_selectedImages[i].path);
         results.add(result);
+
+        // Guardar en SQLite
+        await _db.insertReceipt(result);
+        savedCount++;
+
         setState(() {
           _processedCount = i + 1;
         });
@@ -88,9 +96,25 @@ class _ImagePickerScreenState extends State<ImagePickerScreen> {
       return;
     }
 
-    // Devolver resultados a la pantalla anterior
+    // Mostrar mensaje de éxito
     if (mounted) {
-      Navigator.pop(context, results);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '$savedCount comprobante${savedCount != 1 ? 's' : ''} guardado${savedCount != 1 ? 's' : ''}',
+          ),
+          backgroundColor: Colors.green[600],
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
+    }
+
+    // Devolver a HomeScreen para que recargue la lista
+    if (mounted) {
+      Navigator.pop(context, true); // true indica que se guardaron comprobantes
     }
   }
 
