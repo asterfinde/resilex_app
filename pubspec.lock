@@ -451,7 +451,7 @@ packages:
   receipt_parser:
     dependency: "direct main"
     description:
-      path: "../../packages/receipt_parser"
+      path: "../packages/receipt_parser"
       relative: true
     source: path
     version: "1.0.0"

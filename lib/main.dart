@@ -9,7 +9,7 @@ void main() {
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
-  
+
   runApp(const Resilex());
 }
 
@@ -27,15 +27,15 @@ class Resilex extends StatelessWidget {
   }
 
   ThemeData _buildDarkTheme() {
-    const Color cyanAccent = Color(0xFF00E5CC); // Cyan vibrante de la imagen
-    const Color darkBg = Color(0xFF0A0A0A);     // Negro profundo
-    const Color cardBg = Color(0xFF1A1A1A);     // Gris oscuro para cards
-    
+    const Color cyanAccent = Color(0xFF22d3ee); // Cyan base
+    const Color darkBg = Color(0xFF0A0A0A); // Negro profundo
+    const Color cardBg = Color(0xFF1A1A1A); // Gris oscuro para cards
+
     return ThemeData(
       brightness: Brightness.dark,
       useMaterial3: true,
       scaffoldBackgroundColor: darkBg,
-      
+
       // Color scheme con cyan accent
       colorScheme: ColorScheme.dark(
         primary: cyanAccent,
@@ -47,7 +47,7 @@ class Resilex extends StatelessWidget {
         onSurface: Colors.white,
         onBackground: Colors.white,
       ),
-      
+
       // AppBar transparente y minimalista
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
@@ -62,16 +62,14 @@ class Resilex extends StatelessWidget {
         ),
         iconTheme: IconThemeData(color: cyanAccent),
       ),
-      
+
       // Cards con bordes redondeados
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: cardBg,
         elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
-      
+
       // Botones con estilo cyan
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
@@ -80,13 +78,10 @@ class Resilex extends StatelessWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          textStyle: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 16,
-          ),
+          textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
         ),
       ),
-      
+
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: cyanAccent,
@@ -94,32 +89,53 @@ class Resilex extends StatelessWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          textStyle: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 16,
-          ),
+          textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
         ),
       ),
-      
+
       // Text styles
       textTheme: const TextTheme(
-        displayLarge: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        displayMedium: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        displaySmall: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        headlineLarge: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-        headlineMedium: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-        headlineSmall: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+        displayLarge: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+        displayMedium: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+        displaySmall: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+        headlineLarge: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w600,
+        ),
+        headlineMedium: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w600,
+        ),
+        headlineSmall: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w600,
+        ),
         titleLarge: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-        titleMedium: TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
-        titleSmall: TextStyle(color: Colors.white70, fontWeight: FontWeight.w500),
+        titleMedium: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w500,
+        ),
+        titleSmall: TextStyle(
+          color: Colors.white70,
+          fontWeight: FontWeight.w500,
+        ),
         bodyLarge: TextStyle(color: Colors.white),
         bodyMedium: TextStyle(color: Colors.white70),
         bodySmall: TextStyle(color: Colors.white60),
       ),
-      
+
       // Icons
       iconTheme: const IconThemeData(color: cyanAccent),
-      
+
       // Dividers
       dividerColor: Colors.white12,
     );

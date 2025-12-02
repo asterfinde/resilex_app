@@ -1,12 +1,12 @@
 ﻿// lib/screens/home_screen.dart
 
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:receipt_parser/receipt_parser.dart';
-import 'results_screen.dart';
-import 'dart:io';
+import 'package:intl/intl.dart';
+import '../widgets/ticket_list_item.dart';
+import 'image_picker_screen.dart';
+import 'export_screen.dart';
 
-/// Pantalla principal para seleccionar imágenes de tickets
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -15,166 +15,85 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final ImagePicker _picker = ImagePicker();
-  final ReceiptParser _parser = ReceiptParser();
-
-  List<XFile> _selectedImages = [];
-  bool _isProcessing = false;
-  int _processedCount = 0;
+  List<ReceiptData> _tickets = [];
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void dispose() {
-    _parser.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  Future<void> _pickImagesFromGallery() async {
-    try {
-      final List<XFile> images = await _picker.pickMultiImage();
-      if (images.isNotEmpty) {
-        setState(() {
-          _selectedImages = images;
-        });
-      }
-    } catch (e) {
-      _showError('Error al seleccionar imágenes: $e');
-    }
-  }
+  Map<String, List<ReceiptData>> _groupTicketsByMonth(
+    List<ReceiptData> tickets,
+  ) {
+    final Map<String, List<ReceiptData>> grouped = {};
 
-  Future<void> _pickImageFromCamera() async {
-    try {
-      final XFile? image = await _picker.pickImage(source: ImageSource.camera);
-      if (image != null) {
-        setState(() {
-          _selectedImages.add(image);
-        });
-      }
-    } catch (e) {
-      _showError('Error al capturar foto: $e');
-    }
-  }
+    for (var ticket in tickets) {
+      if (ticket.date == null || ticket.date!.isEmpty) continue;
 
-  Future<void> _processImages() async {
-    if (_selectedImages.isEmpty) {
-      _showError('No hay imágenes seleccionadas');
-      return;
-    }
-
-    setState(() {
-      _isProcessing = true;
-      _processedCount = 0;
-    });
-
-    final List<ReceiptData> results = [];
-    final List<String> errors = [];
-
-    for (int i = 0; i < _selectedImages.length; i++) {
       try {
-        final result = await _parser.parseFromImage(_selectedImages[i].path);
-        results.add(result);
-        setState(() {
-          _processedCount = i + 1;
-        });
+        DateTime? date;
+        final dateStr = ticket.date!;
+
+        // Parsear fecha dd/MM/yyyy
+        if (dateStr.contains('/')) {
+          final parts = dateStr.split('/');
+          if (parts.length == 3) {
+            date = DateTime(
+              int.parse(parts[2]),
+              int.parse(parts[1]),
+              int.parse(parts[0]),
+            );
+          }
+        }
+
+        if (date != null) {
+          final monthKey = DateFormat('MMMM yyyy', 'es_PE').format(date);
+          grouped.putIfAbsent(monthKey, () => []);
+          grouped[monthKey]!.add(ticket);
+        }
       } catch (e) {
-        errors.add('Imagen ${i + 1}: $e');
+        // Si falla el parseo, ignorar
+        continue;
       }
     }
 
-    setState(() {
-      _isProcessing = false;
-    });
+    return grouped;
+  }
 
-    if (results.isEmpty) {
-      _showError('No se pudo procesar ninguna imagen');
-      return;
-    }
-
-    if (mounted) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ResultsScreen(
-            receipts: results,
-            errors: errors,
-          ),
+  void _showTicketDetails(ReceiptData ticket) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        title: const Text(
+          'Detalles del Ticket',
+          style: TextStyle(color: Colors.white),
         ),
-      );
-    }
-  }
-
-  void _clearSelection() {
-    setState(() {
-      _selectedImages = [];
-    });
-  }
-
-  void _showError(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red[400],
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: SafeArea(
-        child: Column(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildHeader(),
-            Expanded(
-              child: _isProcessing ? _buildProcessingView() : _buildMainView(),
+            _buildDetailRow('Cliente', ticket.merchant ?? 'N/A'),
+            _buildDetailRow(
+              'Monto',
+              NumberFormat.currency(
+                locale: 'en_US',
+                symbol: 'S/ ',
+                decimalDigits: 2,
+              ).format(ticket.amount ?? 0),
             ),
+            _buildDetailRow('Fecha', ticket.date ?? 'N/A'),
+            _buildDetailRow('N° Operación', ticket.operationNumber ?? 'N/A'),
           ],
         ),
-      ),
-      bottomNavigationBar: _buildBottomBar(),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Resilex',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -1,
-                ),
-              ),
-              if (_selectedImages.isNotEmpty && !_isProcessing)
-                IconButton(
-                  onPressed: _clearSelection,
-                  icon: const Icon(Icons.delete_outline, size: 28),
-                  style: IconButton.styleFrom(
-                    foregroundColor: Colors.red[400],
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            _selectedImages.isEmpty 
-                ? 'Selecciona tus tickets'
-                : '${_selectedImages.length} imagen${_selectedImages.length != 1 ? 'es' : ''} seleccionada${_selectedImages.length != 1 ? 's' : ''}',
-            style: TextStyle(
-              fontSize: 14,
-              color: _selectedImages.isEmpty ? Colors.white38 : Theme.of(context).colorScheme.primary,
-              fontWeight: _selectedImages.isEmpty ? FontWeight.w400 : FontWeight.w600,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Cerrar',
+              style: TextStyle(color: Color(0xFF22d3ee)),
             ),
           ),
         ],
@@ -182,137 +101,166 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildProcessingView() {
-    final progress = _selectedImages.isEmpty 
-        ? 0.0 
-        : _processedCount / _selectedImages.length;
-
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Stack(
-              alignment: Alignment.center,
-              children: [
-                SizedBox(
-                  width: 80,
-                  height: 80,
-                  child: CircularProgressIndicator(
-                    value: progress,
-                    strokeWidth: 6,
-                    backgroundColor: Colors.white10,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
-                Text(
-                  '$_processedCount',
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              label,
+              style: TextStyle(color: Colors.grey.shade400, fontSize: 14),
             ),
-            const SizedBox(height: 32),
-            Text(
-              'Procesando tickets',
-              style: Theme.of(context).textTheme.titleLarge,
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              '$_processedCount de ${_selectedImages.length}',
-              style: const TextStyle(color: Colors.white54),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildMainView() {
-    if (_selectedImages.isEmpty) {
-      return _buildEmptyState();
+  void _navigateToImagePicker() async {
+    final result = await Navigator.push<List<ReceiptData>>(
+      context,
+      MaterialPageRoute(builder: (context) => const ImagePickerScreen()),
+    );
+
+    if (result != null && result.isNotEmpty) {
+      setState(() {
+        _tickets.addAll(result);
+      });
+    }
+  }
+
+  void _navigateToExport() {
+    if (_tickets.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No hay tickets para exportar'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
     }
 
-    return GridView.builder(
-      padding: const EdgeInsets.all(20),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        childAspectRatio: 0.85,
-      ),
-      itemCount: _selectedImages.length,
-      itemBuilder: (context, index) {
-        return _buildImageCard(index);
-      },
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => ExportScreen(receipts: _tickets)),
     );
   }
 
-  Widget _buildImageCard(int index) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Colors.white10,
-          width: 1.5,
+  @override
+  Widget build(BuildContext context) {
+    final groupedTickets = _groupTicketsByMonth(_tickets);
+    final sortedMonths = groupedTickets.keys.toList();
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'RESILEX',
+          style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2),
         ),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(19),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Image.file(
-              File(_selectedImages[index].path),
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  color: Theme.of(context).cardColor,
-                  child: Icon(
-                    Icons.receipt_long,
-                    size: 48,
-                    color: Colors.white24,
-                  ),
-                );
-              },
+        centerTitle: true,
+        actions: [
+          if (_tickets.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.file_download_outlined),
+              tooltip: 'Exportar CSV',
+              onPressed: _navigateToExport,
             ),
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    Colors.black.withOpacity(0.7),
+        ],
+      ),
+      body: _tickets.isEmpty
+          ? _buildEmptyState()
+          : RefreshIndicator(
+              onRefresh: () async {
+                // Por ahora solo refrescar la UI
+                setState(() {});
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: CustomScrollView(
+                  controller: _scrollController,
+                  slivers: [
+                    const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+                    // Lista agrupada por meses
+                    ...sortedMonths.map((month) {
+                      final monthTickets = groupedTickets[month]!;
+                      final monthTotal = monthTickets.fold<double>(
+                        0,
+                        (sum, t) => sum + (t.amount ?? 0),
+                      );
+
+                      return SliverList(
+                        delegate: SliverChildBuilderDelegate((context, index) {
+                          if (index == 0) {
+                            // Header del mes
+                            return Padding(
+                              padding: const EdgeInsets.only(
+                                top: 8.0,
+                                bottom: 12.0,
+                              ),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    month,
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w500,
+                                      color: Color(0xFF22d3ee),
+                                    ),
+                                  ),
+                                  Text(
+                                    NumberFormat.currency(
+                                      locale: 'en_US',
+                                      symbol: 'S/ ',
+                                      decimalDigits: 2,
+                                    ).format(monthTotal),
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+
+                          // Item de ticket
+                          final ticket = monthTickets[index - 1];
+                          return TicketListItem(
+                            ticket: ticket,
+                            onTap: () => _showTicketDetails(ticket),
+                          );
+                        }, childCount: monthTickets.length + 1),
+                      );
+                    }),
+
+                    const SliverToBoxAdapter(child: SizedBox(height: 80)),
                   ],
                 ),
               ),
             ),
-            Positioned(
-              top: 12,
-              right: 12,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  '${index + 1}',
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _navigateToImagePicker,
+        backgroundColor: const Color(0xFF22d3ee),
+        child: const Icon(Icons.add, color: Colors.black, size: 32),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 
@@ -321,93 +269,26 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Theme.of(context).cardColor,
-              border: Border.all(
-                color: Colors.white10,
-                width: 2,
-              ),
-            ),
-            child: Icon(
-              Icons.receipt_long_outlined,
-              size: 56,
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+          Icon(
+            Icons.receipt_long_outlined,
+            size: 80,
+            color: Colors.grey.shade700,
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'No hay tickets registrados',
+            style: TextStyle(
+              fontSize: 18,
+              color: Colors.grey.shade600,
+              fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(height: 32),
-          const Text(
-            'No hay tickets',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Selecciona imágenes desde tu galería\no toma una foto nueva',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white54,
-              height: 1.4,
-            ),
+          const SizedBox(height: 12),
+          Text(
+            'Presiona + para comenzar',
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildBottomBar() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        border: Border(
-          top: BorderSide(color: Colors.white.withOpacity(0.05), width: 1),
-        ),
-      ),
-      child: SafeArea(
-        top: false,
-        child: _selectedImages.isEmpty
-            ? Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _isProcessing ? null : _pickImagesFromGallery,
-                      icon: const Icon(Icons.photo_library_outlined),
-                      label: const Text('Galería'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 18),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: _isProcessing ? null : _pickImageFromCamera,
-                      icon: const Icon(Icons.camera_alt_outlined),
-                      label: const Text('Cámara'),
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 18),
-                      ),
-                    ),
-                  ),
-                ],
-              )
-            : SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: _isProcessing ? null : _processImages,
-                  icon: const Icon(Icons.bolt),
-                  label: Text('Procesar ${_selectedImages.length} ticket${_selectedImages.length != 1 ? 's' : ''}'),
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 20),
-                  ),
-                ),
-              ),
       ),
     );
   }
