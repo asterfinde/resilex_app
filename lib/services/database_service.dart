@@ -1,6 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-import '../models/receipt_data.dart';
+import '../models/receipt_record.dart';
 
 /// Servicio para gestionar la base de datos SQLite local de comprobantes.
 /// Implementa patrón Singleton para una única instancia de la BD.
@@ -58,7 +58,7 @@ class DatabaseService {
 
   /// Inserta un nuevo comprobante en la base de datos.
   /// Retorna el ID del comprobante insertado, o -1 si ya existe (duplicado).
-  Future<int> insertReceipt(ReceiptData receipt) async {
+  Future<int> insertReceipt(ReceiptRecord receipt) async {
     final Database db = await database;
 
     // Validar duplicados por número de operación
@@ -105,7 +105,7 @@ class DatabaseService {
   }
 
   /// Obtiene todos los comprobantes ordenados por fecha descendente.
-  Future<List<ReceiptData>> getAllReceipts() async {
+  Future<List<ReceiptRecord>> getAllReceipts() async {
     final Database db = await database;
 
     final List<Map<String, dynamic>> maps = await db.query(
@@ -113,7 +113,7 @@ class DatabaseService {
       orderBy: 'date DESC, time DESC',
     );
 
-    return List.generate(maps.length, (i) => ReceiptData.fromMap(maps[i]));
+    return List.generate(maps.length, (i) => ReceiptRecord.fromMap(maps[i]));
   }
 
   /// Obtiene la lista de meses disponibles en la BD (formato: "MM/YYYY").
@@ -140,7 +140,7 @@ class DatabaseService {
   }
 
   /// Obtiene comprobantes de un mes específico (formato: "MM/YYYY" ej: "08/2025").
-  Future<List<ReceiptData>> getReceiptsByMonth(String month) async {
+  Future<List<ReceiptRecord>> getReceiptsByMonth(String month) async {
     final Database db = await database;
 
     // Extraer mes y año del formato "08/2025"
@@ -155,11 +155,11 @@ class DatabaseService {
       orderBy: 'date DESC, time DESC',
     );
 
-    return List.generate(maps.length, (i) => ReceiptData.fromMap(maps[i]));
+    return List.generate(maps.length, (i) => ReceiptRecord.fromMap(maps[i]));
   }
 
   /// Obtiene comprobantes en un rango de fechas (formato: "DD/MM/YYYY").
-  Future<List<ReceiptData>> getReceiptsByDateRange(
+  Future<List<ReceiptRecord>> getReceiptsByDateRange(
     String startDate,
     String endDate,
   ) async {
@@ -172,11 +172,11 @@ class DatabaseService {
       orderBy: 'date DESC, time DESC',
     );
 
-    return List.generate(maps.length, (i) => ReceiptData.fromMap(maps[i]));
+    return List.generate(maps.length, (i) => ReceiptRecord.fromMap(maps[i]));
   }
 
   /// Actualiza un comprobante existente.
-  Future<int> updateReceipt(int id, ReceiptData receipt) async {
+  Future<int> updateReceipt(int id, ReceiptRecord receipt) async {
     final Database db = await database;
 
     return await db.update(

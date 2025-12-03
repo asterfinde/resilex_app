@@ -3,12 +3,12 @@ import 'package:csv/csv.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
-import '../models/receipt_data.dart';
+import '../models/receipt_record.dart';
 
 /// Servicio para exportar datos de recibos a formato CSV
 class CsvExporterService {
   /// Genera el contenido CSV desde una lista de recibos
-  String generateCsvContent(List<ReceiptData> receipts) {
+  String generateCsvContent(List<ReceiptRecord> receipts) {
     if (receipts.isEmpty) {
       return '';
     }
@@ -87,7 +87,7 @@ class CsvExporterService {
 
   /// Proceso completo: generar, guardar y compartir
   Future<Map<String, dynamic>> exportAndShare(
-    List<ReceiptData> receipts,
+    List<ReceiptRecord> receipts,
   ) async {
     try {
       // Generar contenido CSV
@@ -122,7 +122,7 @@ class CsvExporterService {
   }
 
   /// Calcula estadísticas de los recibos
-  Map<String, dynamic> getStatistics(List<ReceiptData> receipts) {
+  Map<String, dynamic> getStatistics(List<ReceiptRecord> receipts) {
     if (receipts.isEmpty) {
       return {'total': 0, 'totalAmount': 0.0, 'byType': <String, int>{}};
     }

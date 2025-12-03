@@ -38,6 +38,10 @@ dependencies:
   # Session cache (MANTENER - crítico para instant restoration)
   shared_preferences: ^2.5.3
   
+  # Receipt parser - Paquete compartido para OCR y parsing
+  receipt_parser:
+    path: ../packages/receipt_parser
+  
   # OCR con Google ML Kit
   google_mlkit_text_recognition: ^0.13.1
   
