@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'core/services/session_cache_service.dart';
 import 'core/bridge/native_state_bridge.dart';
 import 'core/utils/performance_tracker.dart';
@@ -9,7 +10,11 @@ import 'screens/home_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  print(' [Main] Inicializando app...');
+  print('📱 [Main] Inicializando app...');
+
+  // Inicializar locale español para DateFormat
+  await initializeDateFormatting('es_ES', null);
+  print('✅ [Main] Locale español inicializado');
 
   // Inicializar cache antes de renderizar
   await SessionCacheService.init();
