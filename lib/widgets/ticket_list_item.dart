@@ -88,7 +88,7 @@ class TicketListItem extends StatelessWidget {
                       ticket.merchant,
                       style: const TextStyle(
                         color: Colors.white,
-                        fontWeight: FontWeight.w500,
+                        fontWeight: FontWeight.w400,
                         fontSize: 16,
                       ),
                       overflow: TextOverflow.ellipsis,
@@ -110,7 +110,7 @@ class TicketListItem extends StatelessWidget {
                 currencyFormat.format(ticket.amount),
                 style: const TextStyle(
                   color: Colors.white,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w400,
                   fontSize: 16,
                 ),
               ),
