@@ -6,6 +6,7 @@ import '../widgets/ticket_list_item.dart';
 import 'export_selection_screen.dart';
 import 'backup_selection_screen.dart';
 import 'image_selection_screen.dart';
+import 'receipt_detail_modal.dart';
 
 /// Pantalla principal que muestra la lista de comprobantes procesados
 /// Diseño según pantalla1.png - Lista agrupada por meses
@@ -123,6 +124,15 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     // Recargar después de exportar para evitar pantalla vacía
     _loadReceipts();
+  }
+
+  void _showReceiptDetail(ReceiptRecord receipt) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => ReceiptDetailModal(receipt: receipt),
+    );
   }
 
   @override
@@ -280,7 +290,7 @@ class _HomeScreenState extends State<HomeScreen> {
           return TicketListItem(
             ticket: receipt,
             onTap: () {
-              // TODO: Mostrar detalles del ticket
+              _showReceiptDetail(receipt);
             },
           );
         }),
