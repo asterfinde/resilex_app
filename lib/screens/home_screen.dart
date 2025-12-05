@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:receipt_parser/receipt_parser.dart';
+import 'package:intl/intl.dart';
 import '../models/receipt_record.dart';
 import '../services/database_service.dart';
 import '../widgets/ticket_list_item.dart';
 import 'export_screen.dart';
+import 'image_selection_screen.dart';
 
 /// Pantalla principal que muestra la lista de comprobantes procesados
+/// Diseño según pantalla1.png - Lista agrupada por meses
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -16,12 +17,11 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final DatabaseService _db = DatabaseService();
-  final ImagePicker _picker = ImagePicker();
-  final ReceiptParser _parser = ReceiptParser();
 
   List<ReceiptRecord> _receipts = [];
+  Map<String, List<ReceiptRecord>> _groupedReceipts = {};
+  Map<String, double> _monthlyTotals = {};
   bool _isLoading = true;
-  bool _isProcessing = false;
 
   @override
   void initState() {
@@ -29,17 +29,13 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadReceipts();
   }
 
-  @override
-  void dispose() {
-    _parser.dispose();
-    super.dispose();
-  }
-
   Future<void> _loadReceipts() async {
     setState(() => _isLoading = true);
 
     try {
       final receipts = await _db.getAllReceipts();
+      _groupReceiptsByMonth(receipts);
+
       setState(() {
         _receipts = receipts;
         _isLoading = false;
@@ -54,57 +50,52 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _pickAndProcessImages() async {
+  void _groupReceiptsByMonth(List<ReceiptRecord> receipts) {
+    _groupedReceipts.clear();
+    _monthlyTotals.clear();
+
+    for (final receipt in receipts) {
+      final monthKey = _getMonthKey(receipt.date);
+      if (monthKey.isNotEmpty) {
+        _groupedReceipts.putIfAbsent(monthKey, () => []);
+        _groupedReceipts[monthKey]!.add(receipt);
+
+        _monthlyTotals.putIfAbsent(monthKey, () => 0.0);
+        _monthlyTotals[monthKey] = _monthlyTotals[monthKey]! + receipt.amount;
+      }
+    }
+  }
+
+  String _getMonthKey(String dateStr) {
     try {
-      final List<XFile> images = await _picker.pickMultiImage();
-
-      if (images.isEmpty) return;
-
-      setState(() => _isProcessing = true);
-
-      int processed = 0;
-      int saved = 0;
-
-      for (final image in images) {
-        try {
-          // Procesar con OCR y parser
-          final receiptData = await _parser.parseFromImage(image.path);
-
-          // Convertir a ReceiptRecord
-          final record = ReceiptRecord.fromReceiptData(receiptData);
-
-          // Guardar en SQLite
-          final id = await _db.insertReceipt(record);
-
-          if (id > 0) {
-            saved++;
-          }
-          processed++;
-        } catch (e) {
-          print('Error procesando imagen: $e');
+      // Formato dd/MM/yyyy
+      if (dateStr.contains('/')) {
+        final parts = dateStr.split('/');
+        if (parts.length == 3) {
+          final date = DateTime(
+            int.parse(parts[2]),
+            int.parse(parts[1]),
+            int.parse(parts[0]),
+          );
+          // Formato: "Diciembre 2025"
+          return DateFormat('MMMM yyyy', 'es_ES').format(date);
         }
       }
-
-      setState(() => _isProcessing = false);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('$saved de $processed comprobantes guardados'),
-            backgroundColor: saved > 0 ? Colors.green : Colors.orange,
-          ),
-        );
-      }
-
-      // Recargar lista
-      await _loadReceipts();
     } catch (e) {
-      setState(() => _isProcessing = false);
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
-      }
+      print('Error parseando fecha: $dateStr - $e');
+    }
+    return '';
+  }
+
+  void _navigateToImageSelection() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ImageSelectionScreen()),
+    );
+
+    // Si se procesaron imágenes, recargar
+    if (result == true) {
+      _loadReceipts();
     }
   }
 
@@ -125,11 +116,12 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: const Color(0xFF0A0A0A),
         elevation: 0,
         title: const Text(
-          'Resilex',
+          'RESILEX',
           style: TextStyle(
             color: Colors.white,
             fontSize: 24,
             fontWeight: FontWeight.bold,
+            letterSpacing: 2,
           ),
         ),
         actions: [
@@ -150,21 +142,12 @@ class _HomeScreenState extends State<HomeScreen> {
             )
           : _receipts.isEmpty
           ? _buildEmptyState()
-          : _buildReceiptsList(),
-      floatingActionButton: _isProcessing
-          ? const CircularProgressIndicator(color: Color(0xFF22d3ee))
-          : FloatingActionButton.extended(
-              onPressed: _pickAndProcessImages,
-              backgroundColor: const Color(0xFF22d3ee),
-              icon: const Icon(Icons.add_a_photo, color: Colors.black),
-              label: const Text(
-                'Procesar',
-                style: TextStyle(
-                  color: Colors.black,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
+          : _buildGroupedList(),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _navigateToImageSelection,
+        backgroundColor: const Color(0xFF22d3ee),
+        child: const Icon(Icons.add, color: Colors.black, size: 32),
+      ),
     );
   }
 
@@ -189,7 +172,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Toca el botón para procesar imágenes',
+            'Toca el botón + para comenzar',
             style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
           ),
         ],
@@ -197,24 +180,89 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildReceiptsList() {
+  Widget _buildGroupedList() {
+    final sortedKeys = _groupedReceipts.keys.toList()
+      ..sort((a, b) {
+        // Ordenar por fecha descendente (más reciente primero)
+        try {
+          final dateA = DateFormat('MMMM yyyy', 'es_ES').parse(a);
+          final dateB = DateFormat('MMMM yyyy', 'es_ES').parse(b);
+          return dateB.compareTo(dateA);
+        } catch (e) {
+          return 0;
+        }
+      });
+
     return RefreshIndicator(
       onRefresh: _loadReceipts,
       color: const Color(0xFF22d3ee),
       backgroundColor: const Color(0xFF1A1A1A),
       child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _receipts.length,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        itemCount: sortedKeys.length,
         itemBuilder: (context, index) {
-          final receipt = _receipts[index];
+          final monthKey = sortedKeys[index];
+          final receipts = _groupedReceipts[monthKey]!;
+          final total = _monthlyTotals[monthKey]!;
+
+          return _buildMonthSection(monthKey, receipts, total);
+        },
+      ),
+    );
+  }
+
+  Widget _buildMonthSection(
+    String monthKey,
+    List<ReceiptRecord> receipts,
+    double total,
+  ) {
+    final currencyFormat = NumberFormat.currency(
+      locale: "en_US",
+      symbol: "S/ ",
+      decimalDigits: 2,
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header del mes
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                monthKey,
+                style: const TextStyle(
+                  color: Color(0xFF22d3ee),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Text(
+                currencyFormat.format(total),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Lista de tickets del mes
+        ...receipts.map((receipt) {
           return TicketListItem(
             ticket: receipt,
             onTap: () {
-              // TODO: Mostrar detalles
+              // TODO: Mostrar detalles del ticket
             },
           );
-        },
-      ),
+        }).toList(),
+
+        const SizedBox(height: 16),
+      ],
     );
   }
 }

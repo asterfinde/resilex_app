@@ -4,6 +4,8 @@ import 'package:receipt_parser/receipt_parser.dart';
 /// Extiende ReceiptData del parser con campos adicionales para persistencia.
 class ReceiptRecord {
   final int? id; // ID de SQLite (null si no está guardado aún)
+  final String
+  receiptId; // ID alfanumérico: <type><operationNumber> ej: y56854, p1228777
   final String merchant; // Comercio/Cliente
   final double amount; // Monto
   final String date; // Fecha en formato "dd/MM/yyyy"
@@ -16,6 +18,7 @@ class ReceiptRecord {
 
   ReceiptRecord({
     this.id,
+    String? receiptId,
     required this.merchant,
     required this.amount,
     required this.date,
@@ -25,7 +28,7 @@ class ReceiptRecord {
     this.description,
     this.createdAt,
     this.updatedAt,
-  });
+  }) : receiptId = receiptId ?? _generateReceiptId(type, operationNumber);
 
   /// Crea un ReceiptRecord desde ReceiptData del parser
   factory ReceiptRecord.fromReceiptData(ReceiptData data) {
@@ -42,6 +45,28 @@ class ReceiptRecord {
     );
   }
 
+  /// Genera el ID alfanumérico del comprobante: <type_prefix><operation_number>
+  /// Ejemplos: y56854, p1228777, b123456, u000000
+  static String _generateReceiptId(String type, String? operationNumber) {
+    final prefix = _getTypePrefix(type);
+    final number = operationNumber ?? '000000';
+    return '$prefix$number';
+  }
+
+  /// Obtiene el prefijo de una letra según el tipo
+  static String _getTypePrefix(String type) {
+    switch (type.toLowerCase()) {
+      case 'yape':
+        return 'y';
+      case 'plin':
+        return 'p';
+      case 'boleta':
+        return 'b';
+      default:
+        return 'u'; // unknown
+    }
+  }
+
   /// Detecta el tipo de comprobante desde la descripción
   static String _detectType(String? description) {
     if (description == null) return 'unknown';
@@ -56,6 +81,7 @@ class ReceiptRecord {
   factory ReceiptRecord.fromMap(Map<String, dynamic> map) {
     return ReceiptRecord(
       id: map['id'] as int?,
+      receiptId: map['receipt_id'] as String?,
       merchant: map['merchant'] as String,
       amount: (map['amount'] as num).toDouble(),
       date: map['date'] as String,
@@ -76,6 +102,7 @@ class ReceiptRecord {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
+      'receipt_id': receiptId,
       'merchant': merchant,
       'amount': amount,
       'date': date,
@@ -91,6 +118,7 @@ class ReceiptRecord {
   /// Crea una copia con campos modificados
   ReceiptRecord copyWith({
     int? id,
+    String? receiptId,
     String? merchant,
     double? amount,
     String? date,
@@ -103,6 +131,7 @@ class ReceiptRecord {
   }) {
     return ReceiptRecord(
       id: id ?? this.id,
+      receiptId: receiptId ?? this.receiptId,
       merchant: merchant ?? this.merchant,
       amount: amount ?? this.amount,
       date: date ?? this.date,
@@ -117,6 +146,6 @@ class ReceiptRecord {
 
   @override
   String toString() {
-    return 'ReceiptRecord(id: $id, merchant: $merchant, amount: $amount, date: $date, type: $type)';
+    return 'ReceiptRecord(id: $id, receiptId: $receiptId, merchant: $merchant, amount: $amount, date: $date, type: $type)';
   }
 }

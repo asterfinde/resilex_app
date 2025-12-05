@@ -36,6 +36,7 @@ class DatabaseService {
     await db.execute('''
       CREATE TABLE receipts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        receipt_id TEXT NOT NULL UNIQUE,
         merchant TEXT NOT NULL,
         amount REAL NOT NULL,
         date TEXT NOT NULL,
@@ -49,6 +50,7 @@ class DatabaseService {
     ''');
 
     // Índices para optimizar queries
+    await db.execute('CREATE INDEX idx_receipt_id ON receipts(receipt_id)');
     await db.execute('CREATE INDEX idx_date ON receipts(date DESC)');
     await db.execute('CREATE INDEX idx_type ON receipts(type)');
     await db.execute(
@@ -76,6 +78,7 @@ class DatabaseService {
 
     // No es duplicado - insertar normalmente
     return await db.insert('receipts', {
+      'receipt_id': receipt.receiptId,
       'merchant': receipt.merchant,
       'amount': receipt.amount,
       'date': receipt.date,
@@ -182,6 +185,7 @@ class DatabaseService {
     return await db.update(
       'receipts',
       {
+        'receipt_id': receipt.receiptId,
         'merchant': receipt.merchant,
         'amount': receipt.amount,
         'date': receipt.date,
