@@ -108,12 +108,13 @@ class DatabaseService {
   }
 
   /// Obtiene todos los comprobantes ordenados por fecha descendente.
+  /// Optimizado: usa created_at (que tiene índice) en lugar de date (texto)
   Future<List<ReceiptRecord>> getAllReceipts() async {
     final Database db = await database;
 
     final List<Map<String, dynamic>> maps = await db.query(
       'receipts',
-      orderBy: 'date DESC, time DESC',
+      orderBy: 'created_at DESC', // Usa índice idx_created_at
     );
 
     return List.generate(maps.length, (i) => ReceiptRecord.fromMap(maps[i]));

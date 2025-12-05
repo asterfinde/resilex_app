@@ -153,6 +153,7 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: const Color(0xFF22d3ee),
         child: const Icon(Icons.add, color: Colors.black, size: 32),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 

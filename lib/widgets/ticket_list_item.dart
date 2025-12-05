@@ -14,7 +14,7 @@ class TicketListItem extends StatelessWidget {
       case 'yape':
         return const Color(0xFF6B21A8); // Morado Yape
       case 'plin':
-        return const Color(0xFF22d3ee); // Cyan Plin
+        return const Color(0xFF267a3e); // Verde Plin
       case 'boleta':
         return Colors.white; // Blanco Boleta
       default:
