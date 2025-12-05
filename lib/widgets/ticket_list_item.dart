@@ -71,7 +71,7 @@ class TicketListItem extends StatelessWidget {
                     "S/",
                     style: TextStyle(
                       color: Colors.white,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w500,
                       fontSize: 12,
                     ),
                   ),
@@ -110,7 +110,7 @@ class TicketListItem extends StatelessWidget {
                 currencyFormat.format(ticket.amount),
                 style: const TextStyle(
                   color: Colors.white,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w500,
                   fontSize: 16,
                 ),
               ),
