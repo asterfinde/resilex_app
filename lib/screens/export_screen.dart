@@ -6,8 +6,9 @@ import '../services/csv_exporter_service.dart';
 /// Pantalla para exportar comprobantes a CSV
 class ExportScreen extends StatefulWidget {
   final List<ReceiptRecord> receipts;
+  final String? monthFilter;
 
-  const ExportScreen({super.key, required this.receipts});
+  const ExportScreen({super.key, required this.receipts, this.monthFilter});
 
   @override
   State<ExportScreen> createState() => _ExportScreenState();
@@ -62,9 +63,14 @@ class _ExportScreenState extends State<ExportScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Exportar CSV',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        title: Text(
+          widget.monthFilter != null
+              ? 'Exportar ${widget.monthFilter}'
+              : 'Exportar CSV',
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
       body: _isExporting

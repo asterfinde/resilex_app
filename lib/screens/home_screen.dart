@@ -3,7 +3,7 @@ import 'package:intl/intl.dart';
 import '../models/receipt_record.dart';
 import '../services/database_service.dart';
 import '../widgets/ticket_list_item.dart';
-import 'export_screen.dart';
+import 'export_selection_screen.dart';
 import 'image_selection_screen.dart';
 
 /// Pantalla principal que muestra la lista de comprobantes procesados
@@ -19,14 +19,17 @@ class _HomeScreenState extends State<HomeScreen> {
   final DatabaseService _db = DatabaseService();
 
   List<ReceiptRecord> _receipts = [];
-  Map<String, List<ReceiptRecord>> _groupedReceipts = {};
-  Map<String, double> _monthlyTotals = {};
+  final Map<String, List<ReceiptRecord>> _groupedReceipts = {};
+  final Map<String, double> _monthlyTotals = {};
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadReceipts();
+    // Cargar datos de forma asíncrona sin bloquear el renderizado
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadReceipts();
+    });
   }
 
   Future<void> _loadReceipts() async {
@@ -99,13 +102,15 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _navigateToExport() {
-    Navigator.push(
+  void _navigateToExport() async {
+    await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ExportScreen(receipts: _receipts),
+        builder: (context) => ExportSelectionScreen(allReceipts: _receipts),
       ),
     );
+    // Recargar después de exportar para evitar pantalla vacía
+    _loadReceipts();
   }
 
   @override
@@ -259,7 +264,7 @@ class _HomeScreenState extends State<HomeScreen> {
               // TODO: Mostrar detalles del ticket
             },
           );
-        }).toList(),
+        }),
 
         const SizedBox(height: 16),
       ],
