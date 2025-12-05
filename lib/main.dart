@@ -1,15 +1,20 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'core/services/session_cache_service.dart';
 import 'core/bridge/native_state_bridge.dart';
 import 'core/utils/performance_tracker.dart';
 import 'pages/auth_wrapper.dart';
 import 'pages/login_page.dart';
-import 'pages/home_page.dart';
+import 'screens/home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  print(' [Main] Inicializando app...');
+  print('📱 [Main] Inicializando app...');
+
+  // Inicializar locale español para DateFormat
+  await initializeDateFormatting('es_ES', null);
+  print('✅ [Main] Locale español inicializado');
 
   // Inicializar cache antes de renderizar
   await SessionCacheService.init();
@@ -99,14 +104,14 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Min Test - Instant Restoration',
+      title: 'Resilex - Digitalizador de Comprobantes',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.light(),
       darkTheme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF1A1A1A),
+        scaffoldBackgroundColor: const Color(0xFF0A0A0A),
         colorScheme: ColorScheme.dark(
-          primary: const Color(0xFF00BFA5),
-          secondary: const Color(0xFF00BFA5),
+          primary: const Color(0xFF22d3ee),
+          secondary: const Color(0xFF22d3ee),
         ),
       ),
       themeMode: ThemeMode.dark, // Forzar tema oscuro
@@ -114,7 +119,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       routes: {
         '/': (context) => const AuthWrapper(),
         '/login': (context) => const LoginPage(),
-        '/home': (context) => const HomePage(),
+        '/home': (context) => const HomeScreen(),
       },
     );
   }

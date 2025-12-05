@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import '../core/services/session_cache_service.dart';
-import 'home_page.dart';
+import '../screens/home_screen.dart';
 import 'login_page.dart';
 
 /// AuthWrapper con renderizado optimista
 ///
 /// PATRÓN ZYNC:
 /// 1. Lee cache SÍNCRONO desde memoria RAM (<1ms)
-/// 2. Muestra HomePage INSTANTÁNEAMENTE si hay sesión
+/// 2. Muestra HomeScreen INSTANTÁNEAMENTE si hay sesión
 /// 3. Verifica validez en background (no bloquea UI)
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
@@ -22,10 +22,10 @@ class AuthWrapper extends StatelessWidget {
         '⚡ [AuthWrapper] Sesión desde RAM: ${session['userId']} - INSTANTÁNEO',
       );
 
-      // ⚡ OPTIMIZACIÓN: Mostrar HomePage sin esperar nada
+      // ⚡ OPTIMIZACIÓN: Mostrar HomeScreen sin esperar nada
       return Stack(
         children: [
-          const HomePage(),
+          const HomeScreen(),
 
           // Verificación en background (opcional - no hay Firebase aquí)
           _BackgroundVerification(
