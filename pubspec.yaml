@@ -57,6 +57,9 @@ dependencies:
   # Para generar CSV
   csv: ^6.0.0
   
+  # Para crear archivos ZIP
+  archive: ^3.4.10
+  
   # SQLite para storage local de comprobantes
   sqflite: ^2.3.0
   path: ^1.8.3

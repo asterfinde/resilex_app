@@ -4,6 +4,7 @@ import '../models/receipt_record.dart';
 import '../services/database_service.dart';
 import '../widgets/ticket_list_item.dart';
 import 'export_selection_screen.dart';
+import 'backup_selection_screen.dart';
 import 'image_selection_screen.dart';
 
 /// Pantalla principal que muestra la lista de comprobantes procesados
@@ -102,6 +103,17 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _navigateToBackup() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => BackupSelectionScreen(allReceipts: _receipts),
+      ),
+    );
+    // Recargar después de backup
+    _loadReceipts();
+  }
+
   void _navigateToExport() async {
     await Navigator.push(
       context,
@@ -130,6 +142,12 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         actions: [
+          if (_receipts.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.backup_outlined, color: Color(0xFF22d3ee)),
+              onPressed: _navigateToBackup,
+              tooltip: 'Crear Backup',
+            ),
           if (_receipts.isNotEmpty)
             IconButton(
               icon: const Icon(
